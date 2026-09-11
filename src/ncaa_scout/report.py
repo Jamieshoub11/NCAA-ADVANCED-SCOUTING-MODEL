@@ -117,10 +117,14 @@ def _build_pitcher_report(name: str, bio: PlayerBio, loaded, benchmarks: dict) -
     questions = nar.live_scouting_questions("pitcher", weaknesses)
 
     fb_ev = nar._fb_evidence(profile)
+    if profile["k_pct"] is None and profile["bb_pct"] is None:
+        k_bb_display = NA_TEXT
+    else:
+        k_bb_display = f"{fmt_pct(profile['k_pct'])}-{fmt_pct(profile['bb_pct'])}"
     metric_rows = [
         ("Traditional", "ERA / WHIP / K-BB%",
-         f"{fmt(profile['era'], 2)} / {fmt(profile['whip'], 2)} / {fmt_pct(profile['k_pct'])}-{fmt_pct(profile['bb_pct'])}",
-         f"IP {fmt(profile.get('ip'), 1)}, BF {int(profile['bf']) if profile.get('bf') is not None else 'N/A'}"),
+         f"{fmt(profile['era'], 2)} / {fmt(profile['whip'], 2)} / {k_bb_display}",
+         f"IP {fmt(profile.get('ip'), 1)}, BF {int(profile['bf']) if profile.get('bf') is not None else NA_TEXT}"),
         ("Advanced", "K% / BB% / K-BB ratio",
          f"{fmt_pct(profile['k_pct'])} / {fmt_pct(profile['bb_pct'])} / {fmt(profile['k_bb_ratio'], 2)}",
          "D1 avg approx. K% 22% / BB% 9% / K:BB 2.4"),
