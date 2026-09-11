@@ -63,7 +63,14 @@ def _write_report_file(player_slug: str, report_text: str) -> Path:
 
 
 st.title("⚾ NCAA D1 Advanced Scouting Model")
-st.caption("Upload TrackMan/TruMedia CSVs, generate a full scouting report, and keep every player's data in one place.")
+st.caption("Upload TrackMan/TruMedia CSVs and generate a full scouting report.")
+st.info(
+    "**If this app is running on a hosted/shared deployment** (e.g. Streamlit Community Cloud), "
+    "uploaded files and the Roster tab do **not** survive a redeploy or a sleep/wake cycle — the "
+    "container resets. Always hit **Download .md** on a report you want to keep; don't rely on the "
+    "Roster tab as long-term storage unless you know this instance has persistent storage wired up.",
+    icon="⚠️",
+)
 
 tab_generate, tab_roster, tab_benchmarks = st.tabs(["Generate Report", "Roster", "Benchmarks"])
 
