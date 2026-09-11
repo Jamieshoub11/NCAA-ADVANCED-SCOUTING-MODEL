@@ -13,6 +13,34 @@ you're not retyping it for every roster entry. Override it per-player
 (opponent scouting, transfers) with the School/Conference fields or a
 `bio.json`.
 
+## Pitcher advance scouting (usage, splits, sequencing, "how to attack")
+
+For opponent pitchers with pitch-level data (a TrackMan export, or a TruMedia
+"Movement"-style export), a separate deeper report goes beyond the `/scout`
+template:
+
+```bash
+python advance_scout.py "Pitcher Name" --print
+```
+
+Produces: arsenal, usage by count (0-0 through 3-2), usage by situation
+(First Pitch / Even / Pitcher Ahead / Hitter Ahead / Two Strikes — using
+TruMedia's own count groupings), LHH/RHH usage splits, pitch-to-pitch
+sequencing within each at-bat, and evidence-backed "How to Attack" findings.
+
+Every number carries its own sample size and a confidence tier (INSUFFICIENT
+/ LOW / MODERATE / HIGH — see `src/ncaa_scout/confidence.py` for the
+CI-based thresholds behind those labels). "How to Attack" findings require
+at least MODERATE confidence on their underlying sample to be reported at
+all — see `src/ncaa_scout/pitcher_advance.py`.
+
+**What this does not do:** Zone%, Edge%, Chase%, or any location-based
+heatmap/finding. Those require a plate-location field in feet (TrackMan's
+`PlateLocSide`/`PlateLocHeight`, or an equivalent) that not every export
+provides — see `docs/data_dictionary_pitcher_export.md` for a worked example
+of figuring out whether your export has one. The tool won't guess at an
+unconfirmed coordinate system just to fill in a number.
+
 ## Quick start
 
 ```bash

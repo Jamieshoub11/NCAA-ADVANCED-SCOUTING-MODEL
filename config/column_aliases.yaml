@@ -8,6 +8,14 @@
 # --- identity / context columns (pitch-by-pitch or event-level files) ---
 batter_name: [batter, batter_name, hitter, hitter_name, player]
 pitcher_name: [pitcher, pitcher_name]
+batter_hand: [batterhand, batter_hand, batside, stand]
+pitcher_hand: [pitcherhand, pitcher_hand, throws, p_throws]
+ball_strike_count: [count, ball_strike_count]
+inning_half: [inn, inning_half]
+ab_num_in_game: [abnumingame, ab_num_in_game]
+pitch_num_in_ab: [pitchnuminab, pitch_num_in_ab]
+spin_direction: [spindir, spin_direction, spin_axis]
+game_id: [gameid, game_id]
 # pitchType/pitchtype is TrackMan's own header AND, coincidentally, TruMedia's
 # short-code column (FA/SL/CH/...) in the same movement export that also has
 # pitchTypeFull (Fastball/Slider/...). When both are present in one file,
