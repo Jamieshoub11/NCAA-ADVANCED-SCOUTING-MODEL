@@ -70,6 +70,12 @@ rel_side: [relside, rel_side]
 extension: [extension]
 plate_loc_height: [platelocheight, plate_loc_height, loc_height]
 plate_loc_side: [platelocside, plate_loc_side, loc_side]
+# TruMedia's own normalized plate coordinate — NOT the same unit convention as
+# TrackMan's plate_loc_side/height (those are feet; these are normalized, likely
+# per-batter). Kept as a separate canonical field so the two are never mixed;
+# see src/ncaa_scout/zone_calibration.py for how a zone is derived from these.
+trumedia_loc_x: [x, pxnorm]
+trumedia_loc_y: [y, pznorm]
 tagged_hit_type: [taggedhittype, tagged_hit_type, hit_type]
 
 # --- synergy-style qualitative/tag columns (best-effort; often notes, not numbers) ---

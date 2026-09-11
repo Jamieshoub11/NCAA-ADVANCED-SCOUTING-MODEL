@@ -10,6 +10,7 @@ from pathlib import Path
 import pandas as pd
 
 from . import hitter_advance as ha
+from . import metrics_hitting as mh
 from .io_utils import load_benchmarks, load_player_data
 from .stat_utils import NA_TEXT, fmt, fmt_pct
 
@@ -41,9 +42,37 @@ def build_hitter_advance_report(player_name: str, data_dir: Path | None = None) 
         lines.append(f"No pitch-level data found for {player_name}. {NA_TEXT}")
         return "\n".join(lines)
 
-    lines.append(f"*Based on {len(df)} tracked pitches seen. Chase%, damage zones, and pull/center/oppo "
-                 f"direction are not included — they require plate-location and batted-ball-direction "
-                 f"fields not present in this data source. See docs/data_dictionary_pitcher_export.md.*")
+    lines.append(f"*Based on {len(df)} tracked pitches seen. Pull/center/oppo direction is not included — "
+                 f"it requires a batted-ball-direction field not present in this data source. "
+                 f"See docs/data_dictionary_pitcher_export.md.*")
+    lines.append("")
+
+    # --- Chase% / Zone Contact ---
+    discipline = mh.swing_discipline(loaded.pitch_level, player_name, benchmarks)
+    lines.append("## Chase% & Zone Contact")
+    if discipline.get("zone_pct") is not None:
+        lines.append(f"Zone% seen {fmt_pct(discipline['zone_pct'])} | Chase% {fmt_pct(discipline['chase_pct'])} | "
+                     f"Zone-Whiff% {fmt_pct(discipline['zone_whiff_pct'])} | Whiff% {fmt_pct(discipline['whiff_pct'])} "
+                     f"(D1 avg approx. Chase% 28% / Zone-Whiff% 15%) — N={discipline.get('pitch_n', 0)} pitches")
+        calibration = discipline.get("zone_calibration")
+        if calibration:
+            v = calibration["validation"]
+            method = "held-out" if v["held_out"] else "in-sample (too few called pitches for a held-out split)"
+            lines.append(
+                f"\n*Zone boundary self-calibrated from this hitter's own {calibration['n_called_strikes']} called "
+                f"strikes and {calibration['n_called_balls']} called balls seen — {method} accuracy "
+                f"{fmt_pct(v['accuracy'])} vs. a {fmt_pct(v['baseline_accuracy'])} majority-class baseline.*"
+            )
+    else:
+        lines.append(f"{NA_TEXT} — no usable plate-location field, and not enough called pitches "
+                     f"(need 50+, with 10+ of each call) to self-calibrate one.")
+    lines.append("")
+
+    # --- Damage / Weakness Zone ---
+    zonal = mh.zonal_profile(loaded.pitch_level, player_name, benchmarks)
+    lines.append("## Damage Zone / Weakness Zone")
+    lines.append(f"- **Damage Zone:** {zonal.get('damage_zone') or NA_TEXT}")
+    lines.append(f"- **Weakness Zone:** {zonal.get('weakness_zone') or NA_TEXT}")
     lines.append("")
 
     lines.extend(_stats_table("vs. RHP / LHP", ha.performance_vs_pitcher_hand(df)))

@@ -46,9 +46,7 @@ def build_pitcher_advance_report(player_name: str, data_dir: Path | None = None)
 
     total_n = len(df)
     lines.append(f"*Based on {total_n} tracked pitches. Every tendency below shows its own sample size (N) "
-                 f"and confidence tier — see confidence.py for the CI-based thresholds. Location-dependent "
-                 f"metrics (Zone%, Edge%, Chase%, heatmaps) are not included: this data source has no "
-                 f"plate-location field usable in a TrackMan-style feet-based strike zone.*")
+                 f"and confidence tier — see confidence.py for the CI-based thresholds.*")
     lines.append("")
 
     # --- Arsenal ---
@@ -67,6 +65,28 @@ def build_pitcher_advance_report(player_name: str, data_dir: Path | None = None)
             )
     else:
         lines.append(NA_TEXT)
+    lines.append("")
+
+    # --- Command & Control ---
+    lines.append("## Command & Control")
+    calibration = arsenal_data.get("zone_calibration")
+    if arsenal_data.get("zone_pct") is not None:
+        lines.append(f"Zone% {fmt_pct(arsenal_data['zone_pct'])} | Edge% {fmt_pct(arsenal_data['edge_pct'])} | "
+                     f"Chase% {fmt_pct(arsenal_data['chase_pct'])} (D1 avg approx. Zone% 52% / Edge% 18% / Chase% 28%)")
+        if calibration:
+            v = calibration["validation"]
+            method = "held-out" if v["held_out"] else "in-sample (too few called pitches for a held-out split)"
+            lines.append(
+                f"\n*Zone boundary self-calibrated from this pitcher's own {calibration['n_called_strikes']} called "
+                f"strikes and {calibration['n_called_balls']} called balls (no TrackMan-style plate-location field "
+                f"was present) — {method} accuracy {fmt_pct(v['accuracy'])} vs. a {fmt_pct(v['baseline_accuracy'])} "
+                f"majority-class baseline. See zone_calibration.py.*"
+            )
+        else:
+            lines.append("\n*From TrackMan-style plate-location data (plate_loc_side/plate_loc_height).*")
+    else:
+        lines.append(f"{NA_TEXT} — no usable plate-location field, and not enough called pitches "
+                     f"(need 50+, with 10+ of each call) to self-calibrate one.")
     lines.append("")
 
     # --- Usage by count ---
@@ -117,7 +137,7 @@ def build_pitcher_advance_report(player_name: str, data_dir: Path | None = None)
     lines.append("")
 
     # --- How to Attack ---
-    findings = pa.build_attack_findings(df)
+    findings = pa.build_attack_findings(df, zone_info=arsenal_data, benchmarks=benchmarks)
     lines.append("## HOW TO ATTACK HIM")
     if findings:
         for i, f in enumerate(findings, 1):

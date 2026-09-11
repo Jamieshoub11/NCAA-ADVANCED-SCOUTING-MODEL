@@ -186,17 +186,41 @@ def outcome_to_next_pitch(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def build_attack_findings(df: pd.DataFrame) -> list[dict]:
+def build_attack_findings(df: pd.DataFrame, zone_info: dict | None = None, benchmarks: dict | None = None) -> list[dict]:
     """Evidence-backed 'How to Attack' findings. Every finding requires at
     least MODERATE confidence (N>=30) on the group it's drawn from — a
     tendency isn't reported as actionable unless the sample backs it. Purely
     descriptive tables (usage_by_count, etc.) are separate and can be shown
     at any confidence tier with their N visible; this function is only for
     the "act on this" recommendations, which are held to a higher bar.
+
+    zone_info (optional): the dict returned by metrics_pitching.pitch_arsenal
+    (zone_pct/edge_pct/chase_pct/zone_calibration) — when supplied and backed
+    by adequate confidence, adds a command/control-based finding.
     """
     findings = []
     if df.empty or "pitch_type" not in df.columns:
         return findings
+
+    if zone_info and benchmarks and zone_info.get("zone_pct") is not None:
+        pitch_n = zone_info.get("pitch_n", 0)
+        if confidence_tier(pitch_n) in (MODERATE, HIGH):
+            pb = benchmarks.get("pitching", {})
+            zone_bm = pb.get("zone_pct", {})
+            chase_bm = pb.get("chase_pct", {})
+            zone_pct, chase_pct = zone_info["zone_pct"], zone_info["chase_pct"]
+            if zone_bm and zone_pct <= zone_bm["mean"] - zone_bm["sd"]:
+                findings.append({
+                    "finding": "Works out of the zone more than a typical D1 arm — living on the edges/expanded, not pounding the zone.",
+                    "evidence": f"Zone% {zone_pct * 100:.0f}% vs. D1 avg approx. {zone_bm['mean']*100:.0f}% (N={pitch_n} pitches).",
+                    "confidence": confidence_tier(pitch_n),
+                })
+            if chase_bm and chase_pct is not None and chase_pct >= chase_bm["mean"] + chase_bm["sd"]:
+                findings.append({
+                    "finding": "Generates chases at an above-average rate — hitters are expanding the zone against him.",
+                    "evidence": f"Chase% {chase_pct * 100:.0f}% vs. D1 avg approx. {chase_bm['mean']*100:.0f}% (N={pitch_n} pitches).",
+                    "confidence": confidence_tier(pitch_n),
+                })
 
     overall_usage = df["pitch_type"].value_counts(normalize=True)
 

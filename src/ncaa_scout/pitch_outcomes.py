@@ -67,3 +67,26 @@ def is_whiff(raw) -> bool:
 
 def is_inplay(raw) -> bool:
     return classify(raw) == "inplay"
+
+
+_CALLED_STRIKE_KEYWORDS = ("strikecalled", "strikelooking", "strikeoutlooking")
+_CALLED_BALL_KEYWORDS = ("ballcalled", "ballindirt", "ballintentional", "walk")
+
+
+def no_swing_detail(raw) -> str | None:
+    """For pitches classify() marks 'no_swing', distinguishes a called
+    strike from a called ball/take (needed to calibrate a zone boundary from
+    umpire ground truth — see zone_calibration.py). Returns 'called_strike',
+    'called_ball', 'hbp', or None (not a no-swing pitch, or an unrecognized
+    no-swing value that shouldn't be guessed into either bucket).
+    """
+    if classify(raw) != "no_swing":
+        return None
+    norm = _normalize(raw)
+    if "hitbypitch" in norm:
+        return "hbp"
+    if norm == "ball" or any(k in norm for k in _CALLED_BALL_KEYWORDS):
+        return "called_ball"
+    if any(k in norm for k in _CALLED_STRIKE_KEYWORDS):
+        return "called_strike"
+    return None

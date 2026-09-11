@@ -10,6 +10,7 @@ from __future__ import annotations
 import pandas as pd
 
 from . import pitch_outcomes as po
+from . import zone_calibration as zc
 from .stat_utils import safe_div
 
 COUNTING_FIELDS = ["pa", "ab", "h", "b1", "b2", "b3", "hr", "bb", "ibb", "hbp", "so", "sf", "sh"]
@@ -145,15 +146,8 @@ def contact_quality(pitch_level_dfs: list[pd.DataFrame], player_name: str, bench
     return out
 
 
-def _in_zone(row, sz: dict) -> bool | None:
-    side, height = row.get("plate_loc_side"), row.get("plate_loc_height")
-    if pd.isna(side) or pd.isna(height):
-        return None
-    return (sz["side_min"] <= side <= sz["side_max"]) and (sz["height_min"] <= height <= sz["height_max"])
-
-
 def swing_discipline(pitch_level_dfs: list[pd.DataFrame], player_name: str, benchmarks: dict) -> dict:
-    out = {"whiff_pct": None, "chase_pct": None, "zone_whiff_pct": None, "zone_pct": None, "pitch_n": 0}
+    out = {"whiff_pct": None, "chase_pct": None, "zone_whiff_pct": None, "zone_pct": None, "pitch_n": 0, "zone_calibration": None}
     if not pitch_level_dfs:
         return out
 
@@ -163,8 +157,11 @@ def swing_discipline(pitch_level_dfs: list[pd.DataFrame], player_name: str, benc
 
     combined = combined.copy()
     combined["_outcome"] = combined["pitch_call"].map(po.classify)
-    sz = benchmarks["strike_zone"] if "strike_zone" in benchmarks else benchmarks
-    combined["in_zone"] = combined.apply(lambda r: _in_zone(r, sz), axis=1)
+    in_zone, _is_edge, calibration = zc.get_zone_columns(combined, benchmarks)
+    if in_zone is None:
+        return out
+    combined["in_zone"] = in_zone
+    out["zone_calibration"] = calibration
 
     has_loc = combined["in_zone"].notna()
     n_pitches = int(has_loc.sum())
@@ -214,22 +211,37 @@ def _zone_label(side: float, height: float, sz: dict) -> str:
 
 def zonal_profile(pitch_level_dfs: list[pd.DataFrame], player_name: str, benchmarks: dict, min_n: int = 3) -> dict:
     """Damage zone (highest avg exit velo on balls in play) and weakness zone
-    (highest whiff rate on swings), bucketed into a 3x3 zone grid. Requires
-    plate location on every row; returns None for either side if there isn't
-    enough located data to support a claim.
+    (highest whiff rate on swings), bucketed into a 3x3 zone grid. Uses
+    TrackMan feet-based location if present, otherwise a TruMedia-style
+    normalized location self-calibrated from this player's own called
+    pitches (see zone_calibration.py). Returns None for either side if
+    there isn't enough located data to support a claim.
     """
     out = {"damage_zone": None, "weakness_zone": None}
     if not pitch_level_dfs:
         return out
     combined = pd.concat([_filter_to_player(df, player_name) for df in pitch_level_dfs], ignore_index=True, sort=False)
-    if not {"plate_loc_side", "plate_loc_height"} <= set(combined.columns):
+
+    if {"plate_loc_side", "plate_loc_height"} <= set(combined.columns):
+        side_col, height_col = "plate_loc_side", "plate_loc_height"
+        sz = benchmarks["strike_zone"] if "strike_zone" in benchmarks else benchmarks
+    elif {"trumedia_loc_x", "trumedia_loc_y"} <= set(combined.columns):
+        side_col, height_col = "trumedia_loc_x", "trumedia_loc_y"
+        calibration = zc.calibrate_trumedia_zone(combined)
+        if calibration is None:
+            return out
+        rect = calibration["rect"]
+        sz = {"side_min": rect["x_lo"], "side_max": rect["x_hi"], "height_min": rect["y_lo"], "height_max": rect["y_hi"]}
+    else:
         return out
 
-    sz = benchmarks["strike_zone"] if "strike_zone" in benchmarks else benchmarks
-    combined = combined.dropna(subset=["plate_loc_side", "plate_loc_height"]).copy()
+    combined = combined.dropna(subset=[side_col, height_col]).copy()
     if combined.empty:
         return out
-    combined["zone_label"] = combined.apply(lambda r: _zone_label(r["plate_loc_side"], r["plate_loc_height"], sz), axis=1)
+    combined[side_col] = pd.to_numeric(combined[side_col], errors="coerce")
+    combined[height_col] = pd.to_numeric(combined[height_col], errors="coerce")
+    combined = combined.dropna(subset=[side_col, height_col])
+    combined["zone_label"] = combined.apply(lambda r: _zone_label(r[side_col], r[height_col], sz), axis=1)
 
     if "exit_speed" in combined.columns and "pitch_call" in combined.columns:
         outcomes = combined["pitch_call"].map(po.classify)

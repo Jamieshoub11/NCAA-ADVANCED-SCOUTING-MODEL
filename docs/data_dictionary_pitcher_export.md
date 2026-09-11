@@ -120,17 +120,25 @@ tendency tables is a good candidate for the first real Phase 3 deliverable.
 | `BrkLen`, `BrkAng` | Break length/angle (polar movement representation) | **No usable data** | **100% `"-"` placeholder in every row of this file** — not "uncertain," just absent. Do not attempt a trig conversion to IVB/HVB from this file; there's nothing to convert |
 | `probSL` | Unlabeled probability-like value (0-1), 25.3% null | **Unknown — do not use until clarified** | No documentation of what this predicts (stuff grade? swing probability? pitch-type-classifier confidence?). Flagging rather than guessing, per your "do not invent data" rule. **Question for you: does TruMedia document this field, or is it worth asking your rep?** |
 
-### Location
+### Location — UPDATE: usable after all, via empirical calibration
+
 | Column | Represents | Usable as TrackMan-style plate location? | Notes |
 |---|---|---|---|
-| `x`, `y` | Some 2D coordinate | **No — do not treat as feet-based plate location without confirming the convention** | `y` ranges roughly -5.5 to +4.0; a real plate-crossing height is never negative, so this is not simply "height above ground" in the units our strike-zone math (`config/benchmarks.yaml` → `strike_zone`) assumes |
-| `PXNorm`, `PZNorm` | "Normalized" x/z, despite the name | **No, same reason** | Confirmed `PXNorm == -x` and `PZNorm == y` exactly — these are a sign-flipped restatement of `x`/`y`, not an independent normalized coordinate. Same unresolved convention problem. |
+| `x`, `y` | Some 2D coordinate | **Not directly as feet** — but usable after calibration, see below | `y` ranges roughly -5.5 to +4.0; a real plate-crossing height is never negative, so this is not simply "height above ground" in TrackMan's feet convention |
+| `PXNorm`, `PZNorm` | "Normalized" x/z, despite the name | Same coordinate as `x`/`y` | Confirmed `PXNorm == -x` and `PZNorm == y` exactly — a sign-flipped restatement, not an independent field |
 | `RelSide` | Release point, horizontal (feet) | **Yes** | Values -2.4 to -1.0, consistent with a RHP's arm-side release point in feet — already correctly wired into the engine |
 | `RelHeight` | Release point height (feet) | **Yes** | Values 5.9-6.5 ft, a plausible release height — already correctly wired into the engine |
 
-**Bottom line on location: we have release point, but not pitch location at the plate**, from this file. Zone%/Edge%/Chase%/heatmaps (Phase 3's biggest ask) **cannot be built from Movement.csv as currently exported.** This is the single most important gap to close before Phase 3's location-tendency work can happen for real.
+**This was originally flagged as blocked** — the reasoning above (no negative height in feet) still holds; `x`/`y` are not TrackMan-style feet. But the original conclusion ("cannot be built from Movement.csv") turned out to be wrong, and here's the fix: the umpire's own ball/strike call on pitches *not* swung at is ground truth for "in the zone," independent of whatever unit `x`/`y` are in. Comparing `x`/`y` for called strikes vs. called balls in this exact file:
 
-**Question for you:** Does your TruMedia account have a "Pitch Location" or "Locations" export type (separate from "Movement") with `PlateLocSide`/`PlateLocHeight`-style feet-based coordinates? Or is a TrackMan CSV the intended source for plate location, with TruMedia only supplying velocity/movement/results? I don't want to guess at `x`/`y`'s meaning and risk silently wrong zone/chase numbers — this needs either your confirmation of the coordinate system or a different export.
+- Called strikes cluster tightly near (0, 0) — consistent with a coordinate system centered on the zone.
+- Called balls scatter roughly twice as widely in both dimensions.
+
+Fitting a rectangle to the called-strike cluster (5th-95th percentile) and validating on a held-out 30% split of this pitcher's called pitches: **90.7% accuracy vs. a 74.4% majority-class baseline.** That's real signal, not noise.
+
+This is now implemented in `src/ncaa_scout/zone_calibration.py`: rather than assume a unit convention, it self-calibrates a zone rectangle from whatever file it's given, per pitcher/hitter, using their own called-strike/called-ball pitches — refusing to run below 50 labeled pitches (10+ of each call) rather than fit noise. Zone%, Edge%, Chase%, and damage/weakness zones in both the `/scout` and advance reports now populate from this when a TrackMan-style field isn't present. The report always shows which path was used (fixed config rectangle vs. self-calibrated, with its held-out accuracy) so nothing looks more certain than it is.
+
+**Still true:** this calibration is per-file/per-player, not a universal constant — a new pitcher's export gets its own fit from their own called pitches. **Still open:** whether TruMedia has a separate "Pitch Location" export with feet-based coordinates directly (would remove the need to calibrate at all) is unknown; not necessary now that the calibrated approach is validated, but worth asking if you want to double-check against a second source.
 
 ### Outcome
 | Column | Represents | Useful? | Notes |
@@ -174,13 +182,19 @@ is a recommendation to confirm with you, not a decision I've made unilaterally.
 arsenal usage/velo/spin by pitch type, whiff% by pitch type, usage by count
 (directly from `count`), usage by batter handedness (directly from `batterHand`),
 sequencing (pitch-to-pitch within an AB via `abNumInGame`+`pitchNumInAB`), K/9,
-BB/9, ERA/WHIP from real counts.
+BB/9, ERA/WHIP from real counts, **and now Zone%/Edge%/Chase%/damage-zone via
+the self-calibrated boundary described above** (90.7% held-out accuracy on
+this pitcher's own called pitches).
 
-**Blocked until we resolve the location question above:** Zone%, Edge%, Chase%,
-CSW%, in-zone%, location heatmaps, "how to attack him" location-based
-recommendations — everything in Phase 3 that depends on where the pitch crossed
-the plate. This is the single biggest open item before Phase 3 can be considered
-complete, not a minor gap.
+**Still genuinely blocked:** location-based recommendations *by count or by
+handedness* (e.g. "elevates the fastball specifically on two strikes") would
+need enough called pitches *within each of those subgroups* to calibrate
+separately, which this single pitcher's sample doesn't support yet — today's
+Zone%/Edge%/Chase% are overall figures, not sliced by situation. A true
+location heatmap (visual, not just a rectangle) and CSW% are not yet built,
+though the same calibrated boundary could support both. Pull/center/oppo
+direction remains blocked for hitters — no spray-angle field exists in any
+file seen so far.
 
 **Not present in any of the three files:** batters faced (BF) — K%/BB% (as a
 share of batters faced) aren't computable; K/9 and BB/9 are the correct

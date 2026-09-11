@@ -1,13 +1,16 @@
 """Phase-4-style opposing-hitter advance scouting: performance vs. pitcher
-handedness, vs. pitch type, vs. velocity band, approach by count, and
-evidence-gated vulnerability labels — built entirely from pitch-level data.
+handedness, vs. pitch type, vs. velocity band, approach by count, chase
+tendency, damage/weakness zones, and evidence-gated vulnerability labels —
+built entirely from pitch-level data.
 
-Same honesty rule as pitcher_advance.py: this does NOT compute Chase%, damage
-zones, or pull/center/oppo direction. Chase% and zone-based damage both
-require a plate-location field in feet, which this data source doesn't
-reliably provide (see docs/data_dictionary_pitcher_export.md); pull/center/
-oppo requires a spray-angle/batted-ball-direction field that isn't present
-either. Rather than guess, those sections report N/A with the reason.
+Chase%/damage-zone metrics need a usable strike-zone boundary — either
+TrackMan feet-based location, or a TruMedia-style normalized location
+self-calibrated from this hitter's own called pitches (see
+zone_calibration.py) — and stay N/A when neither is available or there
+aren't enough called pitches to calibrate. Pull/center/oppo direction
+requires a batted-ball spray-angle field that isn't present in this data
+source at all, so that one is always N/A. Rather than guess, both report
+N/A with the specific reason.
 """
 
 from __future__ import annotations
@@ -15,6 +18,7 @@ from __future__ import annotations
 import pandas as pd
 
 from . import pitch_outcomes as po
+from . import zone_calibration as zc
 from .confidence import HIGH, MODERATE, confidence_tier
 from .pitcher_advance import SITUATIONS
 from .stat_utils import safe_div
@@ -189,9 +193,40 @@ def vulnerability_labels(df: pd.DataFrame, benchmarks: dict) -> list[dict]:
                 "confidence": top["confidence"],
             })
 
+    # Chase tendency vs. D1 benchmark (needs a usable zone — TrackMan feet-based
+    # or a self-calibrated TruMedia-style boundary; see zone_calibration.py)
+    in_zone, _, _ = zc.get_zone_columns(df, benchmarks)
+    chase_bm = hb.get("chase_pct", {})
+    if in_zone is not None and "pitch_call" in df.columns and chase_bm:
+        located = df[in_zone.notna()]
+        out_of_zone = located[~in_zone[in_zone.notna()]]
+        if not out_of_zone.empty:
+            outcomes = out_of_zone["pitch_call"].map(po.classify)
+            chase_swings = int(outcomes.isin(("whiff", "foul", "inplay")).sum())
+            chase_pct = safe_div(chase_swings, len(out_of_zone))
+            if confidence_tier(len(out_of_zone)) in (MODERATE, HIGH) and chase_pct is not None:
+                if chase_pct >= chase_bm["mean"] + chase_bm["sd"]:
+                    labels.append({
+                        "label": "Chase-prone",
+                        "evidence": f"Chase% {chase_pct*100:.0f}% vs. D1 avg approx. {chase_bm['mean']*100:.0f}% (N={len(out_of_zone)} pitches out of zone).",
+                        "confidence": confidence_tier(len(out_of_zone)),
+                    })
+                elif chase_pct <= chase_bm["mean"] - chase_bm["sd"]:
+                    labels.append({
+                        "label": "Disciplined — rarely chases",
+                        "evidence": f"Chase% {chase_pct*100:.0f}% vs. D1 avg approx. {chase_bm['mean']*100:.0f}% (N={len(out_of_zone)} pitches out of zone).",
+                        "confidence": confidence_tier(len(out_of_zone)),
+                    })
+    else:
+        labels.append({
+            "label": "Chase tendency, damage zones: N/A — Insufficient Data",
+            "evidence": "No usable plate-location field, and not enough called pitches to self-calibrate one (see docs/data_dictionary_pitcher_export.md).",
+            "confidence": None,
+        })
+
     labels.append({
-        "label": "Chase tendency, damage zones, pull/oppo direction: N/A — Insufficient Data",
-        "evidence": "These require plate-location and/or batted-ball-direction fields not present in this data source (see docs/data_dictionary_pitcher_export.md).",
+        "label": "Pull/center/oppo direction: N/A — Insufficient Data",
+        "evidence": "Requires a batted-ball spray-angle/direction field not present in this data source.",
         "confidence": None,
     })
 

@@ -7,6 +7,7 @@ from __future__ import annotations
 import pandas as pd
 
 from . import pitch_outcomes as po
+from . import zone_calibration as zc
 from .stat_utils import safe_div
 
 PITCHING_COUNTING_FIELDS = ["bf", "ip", "er", "r", "h", "hr_allowed", "bb", "so"]
@@ -96,30 +97,10 @@ def _filter_to_pitcher(df: pd.DataFrame, pitcher_name: str) -> pd.DataFrame:
     return filtered if not filtered.empty else df
 
 
-def _in_zone(row, sz: dict) -> bool | None:
-    side, height = row.get("plate_loc_side"), row.get("plate_loc_height")
-    if pd.isna(side) or pd.isna(height):
-        return None
-    return (sz["side_min"] <= side <= sz["side_max"]) and (sz["height_min"] <= height <= sz["height_max"])
-
-
-def _is_edge(row, sz: dict) -> bool | None:
-    side, height = row.get("plate_loc_side"), row.get("plate_loc_height")
-    if pd.isna(side) or pd.isna(height):
-        return None
-    band = sz.get("edge_band", 0.25)
-    in_outer = (sz["side_min"] - band <= side <= sz["side_max"] + band) and (
-        sz["height_min"] - band <= height <= sz["height_max"] + band
-    )
-    in_inner = (sz["side_min"] + band <= side <= sz["side_max"] - band) and (
-        sz["height_min"] + band <= height <= sz["height_max"] - band
-    )
-    return in_outer and not in_inner
-
-
 def pitch_arsenal(pitch_level_dfs: list[pd.DataFrame], pitcher_name: str, benchmarks: dict) -> dict:
     """Per-pitch-type velo/movement/release/usage/whiff, plus overall command metrics."""
-    result = {"arsenal": {}, "zone_pct": None, "edge_pct": None, "whiff_pct": None, "chase_pct": None, "pitch_n": 0}
+    result = {"arsenal": {}, "zone_pct": None, "edge_pct": None, "whiff_pct": None, "chase_pct": None,
+              "pitch_n": 0, "zone_calibration": None}
     if not pitch_level_dfs:
         return result
 
@@ -160,11 +141,12 @@ def pitch_arsenal(pitch_level_dfs: list[pd.DataFrame], pitcher_name: str, benchm
             arsenal[pitch_name] = entry
         result["arsenal"] = arsenal
 
-    if {"plate_loc_side", "plate_loc_height"} <= set(combined.columns):
-        sz = benchmarks["strike_zone"] if "strike_zone" in benchmarks else benchmarks
+    in_zone, is_edge, calibration = zc.get_zone_columns(combined, benchmarks)
+    if in_zone is not None:
         combined = combined.copy()
-        combined["in_zone"] = combined.apply(lambda r: _in_zone(r, sz), axis=1)
-        combined["is_edge"] = combined.apply(lambda r: _is_edge(r, sz), axis=1)
+        combined["in_zone"] = in_zone
+        combined["is_edge"] = is_edge
+        result["zone_calibration"] = calibration
         located = combined[combined["in_zone"].notna()]
         if not located.empty:
             result["zone_pct"] = float(located["in_zone"].mean())
