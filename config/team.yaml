@@ -1,0 +1,5 @@
+# Your program's defaults. Any player without an explicit school/conference
+# (no bio.json, no --school/--conf flag) is assumed to be one of yours — override
+# per-player for opponent/advance-scouting work.
+school: "Binghamton University"
+conference: "America East"

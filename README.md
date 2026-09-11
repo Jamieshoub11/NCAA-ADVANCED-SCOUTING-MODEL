@@ -7,6 +7,12 @@ back as `N/A — Insufficient Data`, and the tool automatically flags
 statistical contradictions (e.g. a plus SLG paired with a below-average
 Hard-Hit%) instead of quietly reporting a misleading grade.
 
+Built for Binghamton's analytics office: `config/team.yaml` defaults every
+new player's school/conference to Binghamton University / America East, so
+you're not retyping it for every roster entry. Override it per-player
+(opponent scouting, transfers) with the School/Conference fields or a
+`bio.json`.
+
 ## Quick start
 
 ```bash
@@ -17,7 +23,34 @@ python scout.py "Sample Hitter" --data-dir data/sample --print
 python scout.py "Sample Pitcher" --data-dir data/sample --print
 ```
 
-## Daily workflow — scouting a real player
+## Web app (recommended for daily use)
+
+```bash
+streamlit run app.py
+```
+
+Opens a browser UI with three tabs:
+
+- **Generate Report** — enter a player's name/bio, drag in their CSV(s), hit
+  Generate. Renders the report on the page, saves it to `reports/`, and gives
+  you a download button. Every upload is saved to `data/players/<slug>/`
+  under the hood, so it's available next time (in the app or the CLI) too.
+- **Roster** — everyone already ingested, one click to regenerate any report
+  and download it.
+- **Benchmarks** — view and edit the D1 reference means/SDs used for grading,
+  right in the browser. Saves to `config/benchmarks.local.yaml`, which
+  overrides (but never overwrites) the documented defaults in
+  `config/benchmarks.yaml` — delete the local file any time to reset.
+
+This runs locally on your machine (`localhost:8501` by default) — it isn't
+hosted anywhere. To put it on a URL your assistants/coaches can hit without
+you running it, the easiest options are [Streamlit Community Cloud](https://streamlit.io/cloud)
+(free, point it at this repo/branch) or standing up the container on
+Binghamton's own infrastructure if IT allows it. Either way, treat
+`data/players/` as containing real athlete performance data — keep the
+deployment access-restricted to your staff, not public.
+
+## Daily workflow — scouting a real player (CLI)
 
 1. **Drop the player's data in.** Create a folder under `data/players/<name>/`
    (any spelling — it gets slugified) and put whatever CSVs you have in it:
@@ -97,9 +130,10 @@ leaderboard) and every future report immediately uses the better numbers.
 ## Project layout
 
 ```
+app.py                         Streamlit web app — streamlit run app.py
 scout.py                       CLI entrypoint — python scout.py "Player Name"
 src/ncaa_scout/
-  io_utils.py                  CSV discovery, header-alias normalization, bio loading
+  io_utils.py                  CSV discovery, header-alias normalization, bio/team-defaults loading
   metrics_hitting.py           slash line, wOBA/wRC+, contact quality, swing discipline, zonal mapping
   metrics_pitching.py          pitch arsenal, command/control, rate stats
   grading.py                   z-score -> 20-80 scale
@@ -109,6 +143,8 @@ src/ncaa_scout/
 config/
   column_aliases.yaml          header-spelling -> canonical field name
   benchmarks.yaml               D1 reference means/SDs, strike zone bounds, sample-size thresholds
+  benchmarks.local.yaml         optional overrides written by the app's Benchmarks tab (gitignored-safe to commit if you want to share tuned numbers)
+  team.yaml                    your program's default school/conference
 data/sample/                   synthetic demo data (regenerate with scripts/generate_sample_data.py)
 data/players/                  your real per-player data goes here (gitignored)
 tests/                         pytest suite (arithmetic, aliasing, end-to-end report generation)

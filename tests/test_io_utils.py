@@ -1,6 +1,10 @@
 import pandas as pd
+import pytest
 
-from ncaa_scout.io_utils import apply_column_aliases, load_column_aliases, slugify, classify_csv
+from ncaa_scout.io_utils import (
+    apply_column_aliases, load_column_aliases, slugify, classify_csv,
+    load_bio, load_benchmarks, save_benchmarks_override, CONFIG_DIR,
+)
 
 
 def test_camelcase_trackman_headers_map_to_canonical_names():
@@ -32,3 +36,34 @@ def test_classify_csv_boxscore():
 def test_classify_csv_unknown():
     df = pd.DataFrame([{"some_note": "text"}])
     assert classify_csv(df) == "unknown"
+
+
+def test_load_bio_falls_back_to_team_defaults_without_bio_json(tmp_path):
+    bio = load_bio("Totally New Player Nobody Has A Folder For", data_dir=tmp_path)
+    assert bio.school == "Binghamton University"
+    assert bio.conference == "America East"
+
+
+@pytest.fixture
+def clean_benchmarks_override():
+    override_path = CONFIG_DIR / "benchmarks.local.yaml"
+    assert not override_path.exists(), "a stray benchmarks.local.yaml would make this test invalid"
+    yield override_path
+    if override_path.exists():
+        override_path.unlink()
+
+
+def test_benchmarks_override_round_trip(clean_benchmarks_override):
+    base = load_benchmarks()
+    edited = dict(base)
+    edited["hitting"] = {**base["hitting"], "avg": {"mean": 0.999, "sd": 0.111}}
+
+    saved_path = save_benchmarks_override(edited)
+    assert saved_path == clean_benchmarks_override
+    assert saved_path.exists()
+
+    reloaded = load_benchmarks()
+    assert reloaded["hitting"]["avg"]["mean"] == 0.999
+    assert reloaded["hitting"]["avg"]["sd"] == 0.111
+    # untouched sections still come through from the documented defaults
+    assert reloaded["strike_zone"]["side_min"] == base["strike_zone"]["side_min"]

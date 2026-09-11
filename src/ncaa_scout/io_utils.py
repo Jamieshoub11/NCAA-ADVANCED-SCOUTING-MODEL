@@ -30,8 +30,46 @@ def load_column_aliases() -> dict[str, list[str]]:
     return load_yaml(CONFIG_DIR / "column_aliases.yaml")
 
 
+def _deep_merge(base: dict, override: dict) -> dict:
+    result = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(result.get(key), dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
 def load_benchmarks() -> dict:
-    return load_yaml(CONFIG_DIR / "benchmarks.yaml")
+    """Loads config/benchmarks.yaml (the documented factory defaults) and, if
+    present, deep-merges config/benchmarks.local.yaml over it. The local file
+    is what the web app's Benchmarks tab writes to — it never touches the
+    documented defaults file, so your comments/explanations there survive.
+    """
+    base = load_yaml(CONFIG_DIR / "benchmarks.yaml")
+    local_path = CONFIG_DIR / "benchmarks.local.yaml"
+    if local_path.exists():
+        override = load_yaml(local_path) or {}
+        base = _deep_merge(base, override)
+    return base
+
+
+def save_benchmarks_override(benchmarks: dict) -> Path:
+    local_path = CONFIG_DIR / "benchmarks.local.yaml"
+    with open(local_path, "w") as f:
+        f.write(
+            "# Written by the web app's Benchmarks tab — overrides config/benchmarks.yaml.\n"
+            "# Delete this file to fall back to the documented factory defaults.\n"
+        )
+        yaml.safe_dump(benchmarks, f, sort_keys=False)
+    return local_path
+
+
+def load_team_defaults() -> dict:
+    path = CONFIG_DIR / "team.yaml"
+    if not path.exists():
+        return {}
+    return load_yaml(path) or {}
 
 
 def _normalize_header(name: str) -> str:
@@ -89,6 +127,10 @@ class PlayerBio:
 
 def load_bio(player_name: str, data_dir: Path | None = None) -> PlayerBio:
     data_dir = data_dir or DATA_DIR
+    team = load_team_defaults()
+    default_school = team.get("school", PlayerBio.school)
+    default_conf = team.get("conference", PlayerBio.conference)
+
     slug = slugify(player_name)
     bio_path = data_dir / "players" / slug / "bio.json"
     if bio_path.exists():
@@ -96,14 +138,14 @@ def load_bio(player_name: str, data_dir: Path | None = None) -> PlayerBio:
             raw = json.load(f)
         return PlayerBio(
             name=raw.get("name", player_name),
-            school=raw.get("school", PlayerBio.school),
+            school=raw.get("school", default_school),
             position=raw.get("position", PlayerBio.position),
             year=raw.get("year", PlayerBio.year),
             bats=raw.get("bats", PlayerBio.bats),
             throws=raw.get("throws", PlayerBio.throws),
-            conference=raw.get("conference", PlayerBio.conference),
+            conference=raw.get("conference", default_conf),
         )
-    return PlayerBio(name=player_name)
+    return PlayerBio(name=player_name, school=default_school, conference=default_conf)
 
 
 def find_player_files(player_name: str, data_dir: Path | None = None) -> list[Path]:
