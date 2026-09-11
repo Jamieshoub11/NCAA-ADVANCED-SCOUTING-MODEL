@@ -29,3 +29,13 @@ def test_fmt_avg_none_is_na():
 def test_fmt_pct():
     assert fmt_pct(0.245) == "24.5%"
     assert fmt_pct(None) == NA_TEXT
+
+
+def test_fmt_treats_nan_like_none():
+    """A None placed into a pandas DataFrame column that also holds floats
+    silently upcasts to float NaN — every formatter must catch that or it
+    prints the literal text "nan" instead of the N/A sentinel."""
+    nan = float("nan")
+    assert fmt(nan) == NA_TEXT
+    assert fmt_pct(nan) == NA_TEXT
+    assert fmt_avg(nan) == NA_TEXT

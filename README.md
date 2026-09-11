@@ -13,33 +13,43 @@ you're not retyping it for every roster entry. Override it per-player
 (opponent scouting, transfers) with the School/Conference fields or a
 `bio.json`.
 
-## Pitcher advance scouting (usage, splits, sequencing, "how to attack")
+## Advance scouting (usage, splits, sequencing, approach — pitcher or hitter)
 
-For opponent pitchers with pitch-level data (a TrackMan export, or a TruMedia
+For an opponent with pitch-level data (a TrackMan export, or a TruMedia
 "Movement"-style export), a separate deeper report goes beyond the `/scout`
 template:
 
 ```bash
-python advance_scout.py "Pitcher Name" --print
+python advance_scout.py "Player Name" --print
 ```
 
-Produces: arsenal, usage by count (0-0 through 3-2), usage by situation
-(First Pitch / Even / Pitcher Ahead / Hitter Ahead / Two Strikes — using
-TruMedia's own count groupings), LHH/RHH usage splits, pitch-to-pitch
-sequencing within each at-bat, and evidence-backed "How to Attack" findings.
+Auto-detects whether the name is the pitcher or the batter in the data
+(override with `--role pitcher` / `--role hitter`) and builds the matching
+report:
+
+- **Pitcher:** arsenal, usage by count (0-0 through 3-2) and by situation
+  (First Pitch / Even / Pitcher Ahead / Hitter Ahead / Two Strikes — using
+  TruMedia's own count groupings), LHH/RHH usage splits, pitch-to-pitch
+  sequencing within each at-bat, evidence-backed "How to Attack" findings.
+- **Hitter:** performance vs. RHP/LHP, vs. each pitch type, vs. velocity band,
+  approach by count/situation, and evidence-gated approach labels
+  (aggressive/patient early, high-contact, power-oriented, vulnerable to a
+  given pitch type or velocity band — never assigned on a weak sample).
 
 Every number carries its own sample size and a confidence tier (INSUFFICIENT
 / LOW / MODERATE / HIGH — see `src/ncaa_scout/confidence.py` for the
-CI-based thresholds behind those labels). "How to Attack" findings require
-at least MODERATE confidence on their underlying sample to be reported at
-all — see `src/ncaa_scout/pitcher_advance.py`.
+CI-based thresholds behind those labels). Findings/labels phrased as
+actionable require at least MODERATE confidence on their underlying sample
+— see `src/ncaa_scout/pitcher_advance.py` and `hitter_advance.py`.
 
-**What this does not do:** Zone%, Edge%, Chase%, or any location-based
-heatmap/finding. Those require a plate-location field in feet (TrackMan's
-`PlateLocSide`/`PlateLocHeight`, or an equivalent) that not every export
-provides — see `docs/data_dictionary_pitcher_export.md` for a worked example
-of figuring out whether your export has one. The tool won't guess at an
-unconfirmed coordinate system just to fill in a number.
+**What this does not do:** Zone%, Edge%, Chase%, damage zones/heatmaps, or
+pull/center/oppo direction. Location-based metrics need a plate-location
+field in feet (TrackMan's `PlateLocSide`/`PlateLocHeight`, or an equivalent)
+that not every export provides, and batted-ball direction needs a spray-angle
+field most exports don't include either — see
+`docs/data_dictionary_pitcher_export.md` for a worked example of figuring out
+whether your export has one. The tool won't guess at an unconfirmed
+coordinate system just to fill in a number.
 
 ## Quick start
 

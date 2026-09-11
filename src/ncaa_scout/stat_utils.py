@@ -8,6 +8,18 @@ from __future__ import annotations
 NA_TEXT = "N/A — Insufficient Data"
 
 
+def _is_missing(value) -> bool:
+    """True for None and for NaN. Values built via pd.DataFrame(list_of_dicts)
+    silently upcast a column's `None` entries to float NaN whenever any other
+    row in that column is a float — so every formatter here must treat NaN
+    the same as None, or a missing value prints as the literal text "nan"
+    instead of the N/A sentinel.
+    """
+    if value is None:
+        return True
+    return isinstance(value, float) and value != value
+
+
 def safe_div(numerator, denominator):
     if numerator is None or denominator is None:
         return None
@@ -20,7 +32,7 @@ def safe_div(numerator, denominator):
 
 
 def fmt(value, decimals: int = 3, suffix: str = "", na_text: str = NA_TEXT) -> str:
-    if value is None:
+    if _is_missing(value):
         return na_text
     try:
         return f"{value:.{decimals}f}{suffix}"
@@ -29,7 +41,7 @@ def fmt(value, decimals: int = 3, suffix: str = "", na_text: str = NA_TEXT) -> s
 
 
 def fmt_pct(value, decimals: int = 1, na_text: str = NA_TEXT) -> str:
-    if value is None:
+    if _is_missing(value):
         return na_text
     try:
         return f"{value * 100:.{decimals}f}%"
@@ -39,7 +51,7 @@ def fmt_pct(value, decimals: int = 1, na_text: str = NA_TEXT) -> str:
 
 def fmt_avg(value, na_text: str = NA_TEXT) -> str:
     """Batting-average style formatting: .312 instead of 0.312."""
-    if value is None:
+    if _is_missing(value):
         return na_text
     try:
         s = f"{value:.3f}"

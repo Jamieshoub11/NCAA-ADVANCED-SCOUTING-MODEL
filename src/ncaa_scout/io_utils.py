@@ -234,6 +234,25 @@ class LoadedData:
         return bool(self.pitch_level or self.boxscore or self.splits or self.unknown)
 
 
+def detect_advance_role(loaded: "LoadedData", player_name: str) -> str:
+    """Guesses whether `player_name` is the pitcher or the hitter in the
+    pitch-level data loaded, by counting which identity column matches them
+    more often. Defaults to 'pitcher' if neither column is present or both
+    are empty (an all-N/A report is a safer default than a wrong guess with
+    confident-looking output either way, so this only affects which template
+    renders — both templates already say N/A for anything unsupported).
+    """
+    name_lower = player_name.strip().lower()
+    pitcher_hits = 0
+    batter_hits = 0
+    for df in loaded.pitch_level:
+        if "pitcher_name" in df.columns:
+            pitcher_hits += int(df["pitcher_name"].astype(str).str.lower().str.contains(name_lower, na=False).sum())
+        if "batter_name" in df.columns:
+            batter_hits += int(df["batter_name"].astype(str).str.lower().str.contains(name_lower, na=False).sum())
+    return "hitter" if batter_hits > pitcher_hits else "pitcher"
+
+
 def load_player_data(player_name: str, data_dir: Path | None = None) -> LoadedData:
     aliases = load_column_aliases()
     paths = find_player_files(player_name, data_dir)

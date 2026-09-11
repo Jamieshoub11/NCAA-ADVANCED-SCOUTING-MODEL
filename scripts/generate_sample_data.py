@@ -59,6 +59,16 @@ def make_hitter_data():
     exit_speed = np.where(is_inplay, np.clip(rng.normal(93, 9, n_pitches), 55, 112), np.nan)
     angle = np.where(is_inplay, rng.normal(14, 12, n_pitches), np.nan)
 
+    rel_speed = np.select(
+        [pitch_types == "Fastball", pitch_types == "Slider", pitch_types == "Changeup", pitch_types == "Curveball"],
+        [rng.normal(92, 2.2, n_pitches), rng.normal(84, 2.0, n_pitches),
+         rng.normal(83, 1.8, n_pitches), rng.normal(78, 1.8, n_pitches)],
+    )
+    pitcher_hand = rng.choice(["R", "L"], size=n_pitches, p=[0.7, 0.3])
+    counts = ["0-0", "1-0", "0-1", "1-1", "2-0", "0-2", "2-1", "1-2", "3-0", "2-2", "3-1", "3-2"]
+    count_weights = [0.27, 0.13, 0.13, 0.11, 0.05, 0.07, 0.08, 0.07, 0.02, 0.04, 0.02, 0.01]
+    ball_strike_count = rng.choice(counts, size=n_pitches, p=count_weights)
+
     df = pd.DataFrame({
         "Batter": "Sample Hitter",
         "PitchType": pitch_types,
@@ -67,6 +77,9 @@ def make_hitter_data():
         "PitchCall": pitch_call,
         "ExitSpeed": exit_speed,
         "Angle": angle,
+        "RelSpeed": rel_speed,
+        "PitcherHand": pitcher_hand,
+        "Count": ball_strike_count,
     })
     df.to_csv(player_dir / "trackman.csv", index=False)
 
