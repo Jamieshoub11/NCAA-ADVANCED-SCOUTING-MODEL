@@ -121,13 +121,15 @@ def _build_pitcher_report(name: str, bio: PlayerBio, loaded, benchmarks: dict) -
         k_bb_display = NA_TEXT
     else:
         k_bb_display = f"{fmt_pct(profile['k_pct'])}-{fmt_pct(profile['bb_pct'])}"
+    ip_display = fmt(profile.get("ip_display", profile.get("ip")), 1)
     metric_rows = [
         ("Traditional", "ERA / WHIP / K-BB%",
          f"{fmt(profile['era'], 2)} / {fmt(profile['whip'], 2)} / {k_bb_display}",
-         f"IP {fmt(profile.get('ip'), 1)}, BF {int(profile['bf']) if profile.get('bf') is not None else NA_TEXT}"),
-        ("Advanced", "K% / BB% / K-BB ratio",
-         f"{fmt_pct(profile['k_pct'])} / {fmt_pct(profile['bb_pct'])} / {fmt(profile['k_bb_ratio'], 2)}",
-         "D1 avg approx. K% 22% / BB% 9% / K:BB 2.4"),
+         f"IP {ip_display}, BF {int(profile['bf']) if profile.get('bf') is not None else NA_TEXT}"),
+        ("Advanced", "K% / BB% / K/9 / BB/9 / K-BB ratio",
+         f"{fmt_pct(profile['k_pct'])} / {fmt_pct(profile['bb_pct'])} / {fmt(profile['k_per9'], 2)} / "
+         f"{fmt(profile['bb_per9'], 2)} / {fmt(profile['k_bb_ratio'], 2)}",
+         "D1 avg approx. K% 22% / BB% 9% / K:BB 2.4 (K/9, BB/9 shown when BF isn't in the source data)"),
         ("Fastball", "Velo / Max Velo / IVB / Whiff%", fb_ev, "D1 FB velo avg approx. 90.5 mph"),
         ("Command/Control", "Zone% / Edge% / Chase%",
          f"{fmt_pct(profile['zone_pct'])} / {fmt_pct(profile['edge_pct'])} / {fmt_pct(profile['chase_pct'])}",

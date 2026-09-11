@@ -8,7 +8,13 @@
 # --- identity / context columns (pitch-by-pitch or event-level files) ---
 batter_name: [batter, batter_name, hitter, hitter_name, player]
 pitcher_name: [pitcher, pitcher_name]
-pitch_type: [pitch_type, pitchtype, taggedpitchtype, autopitchtype, pitch]
+# pitchType/pitchtype is TrackMan's own header AND, coincidentally, TruMedia's
+# short-code column (FA/SL/CH/...) in the same movement export that also has
+# pitchTypeFull (Fastball/Slider/...). When both are present in one file,
+# apply_column_aliases keeps the later-listed column on a canonical-name
+# collision, and pitchTypeFull is listed after pitchType in that export —
+# so the readable full name wins over the short code.
+pitch_type: [pitch_type, pitchtype, pitchtypefull, taggedpitchtype, autopitchtype, pitch]
 date: [date, game_date]
 
 # --- box score / aggregate counting stats ---
@@ -37,14 +43,18 @@ er: [er, earned_runs]
 hr_allowed: [hr_allowed, hrallowed]
 
 # --- trackman / yakkertech pitch-level batted-ball & pitch metrics ---
-exit_speed: [exitspeed, exit_speed, ev, launch_speed]
+exit_speed: [exitspeed, exit_speed, ev, launch_speed, exitvelocity]
 launch_angle: [angle, launch_angle, launchangle]
 distance: [distance, hit_distance]
 play_result: [playresult, play_result, result]
-pitch_call: [pitchcall, pitch_call, call]
+# pitchresult is TruMedia's descriptive per-pitch outcome ("Strikeout (Swinging)",
+# "Single on a Ground Ball", ...) — see src/ncaa_scout/pitch_outcomes.py for how
+# that vocabulary is classified alongside TrackMan's PitchCall enum.
+pitch_call: [pitchcall, pitch_call, call, pitchresult]
 kor_bb: [korbb, kor_bb]
-rel_speed: [relspeed, rel_speed, velo, velocity]
-spin_rate: [spinrate, spin_rate]
+# releasevelocity/vel are TruMedia's movement-export names for pitch velocity.
+rel_speed: [relspeed, rel_speed, velo, velocity, releasevelocity, vel]
+spin_rate: [spinrate, spin_rate, spin]
 induced_vert_break: [inducedvertbreak, ivb, induced_vert_break]
 horz_break: [horzbreak, hvb, horz_break, horizontal_break]
 rel_height: [relheight, rel_height]

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from . import pitch_outcomes as po
 from .stat_utils import safe_div
 
 COUNTING_FIELDS = ["pa", "ab", "h", "b1", "b2", "b3", "hr", "bb", "ibb", "hbp", "so", "sf", "sh"]
@@ -144,11 +145,6 @@ def contact_quality(pitch_level_dfs: list[pd.DataFrame], player_name: str, bench
     return out
 
 
-_SWING_CALLS = {"strikeswinging", "foulball", "inplay", "foul", "swinging"}
-_WHIFF_CALLS = {"strikeswinging", "swinging"}
-_INPLAY_CALLS = {"inplay"}
-
-
 def _in_zone(row, sz: dict) -> bool | None:
     side, height = row.get("plate_loc_side"), row.get("plate_loc_height")
     if pd.isna(side) or pd.isna(height):
@@ -166,7 +162,7 @@ def swing_discipline(pitch_level_dfs: list[pd.DataFrame], player_name: str, benc
         return out
 
     combined = combined.copy()
-    combined["pitch_call_norm"] = combined["pitch_call"].astype(str).str.lower().str.replace(r"[^a-z]", "", regex=True)
+    combined["_outcome"] = combined["pitch_call"].map(po.classify)
     sz = benchmarks["strike_zone"] if "strike_zone" in benchmarks else benchmarks
     combined["in_zone"] = combined.apply(lambda r: _in_zone(r, sz), axis=1)
 
@@ -177,8 +173,8 @@ def swing_discipline(pitch_level_dfs: list[pd.DataFrame], player_name: str, benc
         return out
 
     located = combined[has_loc]
-    is_swing = located["pitch_call_norm"].isin(_SWING_CALLS)
-    is_whiff = located["pitch_call_norm"].isin(_WHIFF_CALLS)
+    is_swing = located["_outcome"].isin(("whiff", "foul", "inplay"))
+    is_whiff = located["_outcome"] == "whiff"
 
     out["zone_pct"] = float(located["in_zone"].mean())
 
@@ -186,13 +182,13 @@ def swing_discipline(pitch_level_dfs: list[pd.DataFrame], player_name: str, benc
 
     out_of_zone = located[~located["in_zone"]]
     if not out_of_zone.empty:
-        chase_swings = out_of_zone["pitch_call_norm"].isin(_SWING_CALLS).sum()
+        chase_swings = out_of_zone["_outcome"].isin(("whiff", "foul", "inplay")).sum()
         out["chase_pct"] = safe_div(int(chase_swings), out_of_zone.shape[0])
 
     in_zone_df = located[located["in_zone"]]
     if not in_zone_df.empty:
-        zone_swings = in_zone_df["pitch_call_norm"].isin(_SWING_CALLS)
-        zone_whiffs = in_zone_df["pitch_call_norm"].isin(_WHIFF_CALLS)
+        zone_swings = in_zone_df["_outcome"].isin(("whiff", "foul", "inplay"))
+        zone_whiffs = in_zone_df["_outcome"] == "whiff"
         out["zone_whiff_pct"] = safe_div(int(zone_whiffs.sum()), int(zone_swings.sum())) if zone_swings.sum() > 0 else None
 
     return out
@@ -236,8 +232,8 @@ def zonal_profile(pitch_level_dfs: list[pd.DataFrame], player_name: str, benchma
     combined["zone_label"] = combined.apply(lambda r: _zone_label(r["plate_loc_side"], r["plate_loc_height"], sz), axis=1)
 
     if "exit_speed" in combined.columns and "pitch_call" in combined.columns:
-        calls = combined["pitch_call"].astype(str).str.lower().str.replace(r"[^a-z]", "", regex=True)
-        inplay = combined[calls.isin(_INPLAY_CALLS)].copy()
+        outcomes = combined["pitch_call"].map(po.classify)
+        inplay = combined[outcomes == "inplay"].copy()
         inplay["exit_speed"] = pd.to_numeric(inplay["exit_speed"], errors="coerce")
         inplay = inplay.dropna(subset=["exit_speed"])
         if not inplay.empty:
@@ -248,9 +244,9 @@ def zonal_profile(pitch_level_dfs: list[pd.DataFrame], player_name: str, benchma
                 out["damage_zone"] = f"{best} — avg EV {grp.loc[best, 'mean']:.1f} mph on {int(grp.loc[best, 'count'])} batted balls"
 
     if "pitch_call" in combined.columns:
-        calls = combined["pitch_call"].astype(str).str.lower().str.replace(r"[^a-z]", "", regex=True)
-        combined["is_swing"] = calls.isin(_SWING_CALLS)
-        combined["is_whiff"] = calls.isin(_WHIFF_CALLS)
+        outcomes = combined["pitch_call"].map(po.classify)
+        combined["is_swing"] = outcomes.isin(("whiff", "foul", "inplay"))
+        combined["is_whiff"] = outcomes == "whiff"
         swings = combined[combined["is_swing"]]
         if not swings.empty:
             grp = swings.groupby("zone_label").agg(swings=("is_swing", "sum"), whiffs=("is_whiff", "sum"))

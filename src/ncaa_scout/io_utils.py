@@ -94,6 +94,12 @@ def apply_column_aliases(df: pd.DataFrame, aliases: dict[str, list[str]] | None 
 
     Columns with no known alias are kept as-is (normalized) rather than dropped,
     so nothing is silently lost.
+
+    If two raw columns in the same file map to the same canonical name (e.g. a
+    TruMedia export with both a short pitch-type code and a full-name column),
+    the later-occurring column wins — see the comment on `pitch_type` in
+    column_aliases.yaml for why that's the right tiebreak there. Earlier
+    duplicates are dropped rather than left as ambiguous repeated column labels.
     """
     if aliases is None:
         aliases = load_column_aliases()
@@ -102,7 +108,8 @@ def apply_column_aliases(df: pd.DataFrame, aliases: dict[str, list[str]] | None 
     for col in df.columns:
         norm = _normalize_header(col)
         rename_map[col] = lookup.get(norm, norm)
-    return df.rename(columns=rename_map)
+    renamed = df.rename(columns=rename_map)
+    return renamed.loc[:, ~renamed.columns.duplicated(keep="last")]
 
 
 def slugify(name: str) -> str:
@@ -190,13 +197,24 @@ def find_player_files(player_name: str, data_dir: Path | None = None) -> list[Pa
     return sorted(set(found))
 
 
+CSV_KIND_SPLITS_MARKER_COLS = {"splitbyname"}
 CSV_KIND_PITCH_LEVEL_COLS = {"rel_speed", "plate_loc_height", "plate_loc_side", "exit_speed", "pitch_call"}
 CSV_KIND_BOXSCORE_COLS = {"ab", "h", "pa"}
 
 
 def classify_csv(df: pd.DataFrame) -> str:
-    """Best-effort guess at what kind of export this dataframe is."""
+    """Best-effort guess at what kind of export this dataframe is.
+
+    Checked in this order because a TruMedia "SplitBy" export (Home/Away,
+    LHH/RHH, by-month, by-pitch-type, by-count, ... concatenated into one
+    CSV with a repeating 'splitByName' column) also carries H/BB/ER/IP-shaped
+    columns that would otherwise misclassify it as a per-game box score —
+    summing it alongside a real box score massively overcounts every stat,
+    since most split categories re-express close to the same season total.
+    """
     cols = set(df.columns)
+    if cols & CSV_KIND_SPLITS_MARKER_COLS:
+        return "splits"
     if cols & CSV_KIND_PITCH_LEVEL_COLS:
         return "pitch_level"
     if cols & CSV_KIND_BOXSCORE_COLS:
@@ -208,11 +226,12 @@ def classify_csv(df: pd.DataFrame) -> str:
 class LoadedData:
     pitch_level: list[pd.DataFrame] = field(default_factory=list)
     boxscore: list[pd.DataFrame] = field(default_factory=list)
+    splits: list[pd.DataFrame] = field(default_factory=list)
     unknown: list[pd.DataFrame] = field(default_factory=list)
     source_paths: list[Path] = field(default_factory=list)
 
     def has_any(self) -> bool:
-        return bool(self.pitch_level or self.boxscore or self.unknown)
+        return bool(self.pitch_level or self.boxscore or self.splits or self.unknown)
 
 
 def load_player_data(player_name: str, data_dir: Path | None = None) -> LoadedData:
@@ -226,7 +245,9 @@ def load_player_data(player_name: str, data_dir: Path | None = None) -> LoadedDa
             continue
         df = apply_column_aliases(df, aliases)
         kind = classify_csv(df)
-        if kind == "pitch_level":
+        if kind == "splits":
+            loaded.splits.append(df)
+        elif kind == "pitch_level":
             loaded.pitch_level.append(df)
         elif kind == "boxscore":
             loaded.boxscore.append(df)
