@@ -1,0 +1,59 @@
+# Maps a canonical field name (used everywhere in src/ncaa_scout) to the list of
+# header spellings different export tools use for that same field.
+#
+# Column headers are normalized before matching: lowercased, stripped, spaces/dashes
+# collapsed to underscores. If your CSV uses a header not listed here, either add it
+# to the right list below, or rename the column in your export — no code changes needed.
+
+# --- identity / context columns (pitch-by-pitch or event-level files) ---
+batter_name: [batter, batter_name, hitter, hitter_name, player]
+pitcher_name: [pitcher, pitcher_name]
+pitch_type: [pitch_type, pitchtype, taggedpitchtype, autopitchtype, pitch]
+date: [date, game_date]
+
+# --- box score / aggregate counting stats ---
+pa: [pa, plate_appearances]
+ab: [ab, at_bats]
+h: [h, hits]
+b1: [1b, singles, single]
+b2: [2b, doubles, double]
+b3: [3b, triples, triple]
+hr: [hr, home_runs, homerun, homeruns]
+bb: [bb, walks, uibb, ubb]
+ibb: [ibb, intentional_walks]
+hbp: [hbp, hit_by_pitch]
+so: [so, k, strikeouts, so_]
+sf: [sf, sac_fly, sac_flies]
+sh: [sh, sac_bunt, sacrifice_bunt]
+r: [r, runs, runs_scored]
+rbi: [rbi, rbis]
+sb: [sb, stolen_bases]
+cs: [cs, caught_stealing]
+
+# --- pitching box score / aggregate stats ---
+bf: [bf, batters_faced, tbf]
+ip: [ip, innings_pitched]
+er: [er, earned_runs]
+hr_allowed: [hr_allowed, hrallowed]
+
+# --- trackman / yakkertech pitch-level batted-ball & pitch metrics ---
+exit_speed: [exitspeed, exit_speed, ev, launch_speed]
+launch_angle: [angle, launch_angle, launchangle]
+distance: [distance, hit_distance]
+play_result: [playresult, play_result, result]
+pitch_call: [pitchcall, pitch_call, call]
+kor_bb: [korbb, kor_bb]
+rel_speed: [relspeed, rel_speed, velo, velocity]
+spin_rate: [spinrate, spin_rate]
+induced_vert_break: [inducedvertbreak, ivb, induced_vert_break]
+horz_break: [horzbreak, hvb, horz_break, horizontal_break]
+rel_height: [relheight, rel_height]
+rel_side: [relside, rel_side]
+extension: [extension]
+plate_loc_height: [platelocheight, plate_loc_height, loc_height]
+plate_loc_side: [platelocside, plate_loc_side, loc_side]
+tagged_hit_type: [taggedhittype, tagged_hit_type, hit_type]
+
+# --- synergy-style qualitative/tag columns (best-effort; often notes, not numbers) ---
+swing_decision: [swing_decision, decision]
+zone_tag: [zone, in_zone]

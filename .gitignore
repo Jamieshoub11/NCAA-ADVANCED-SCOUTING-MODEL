@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+.venv/
+*.egg-info/
+.DS_Store
+
+# Personal player data stays local — reports/CSVs you pull from TruMedia/TrackMan/Synergy
+# often carry data-license restrictions, so don't commit real player exports by default.
+data/players/*
+!data/players/.gitkeep
+
+reports/*.md
+!reports/.gitkeep

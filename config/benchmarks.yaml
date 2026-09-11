@@ -1,0 +1,72 @@
+# D1 reference benchmarks used for grading (20-80 scale) and league-context stats
+# (wRC+, wOBA scale).
+#
+# IMPORTANT: These are calibrated approximations based on publicly known D1 offensive/
+# pitching distributions (roughly Division I aggregate seasons, NCAA-wide). They are NOT
+# an official published percentile table. Swap in your own conference's actual averages
+# here whenever you have them (e.g. from TruMedia league leaderboards) — the model will
+# immediately use the updated numbers for every report. Never treat the defaults below
+# as ground truth in a report; the report always cites these as "D1 approx. benchmark."
+
+hitting:
+  # mean / standard deviation used for z-score -> 20-80 grade conversion
+  avg:            { mean: 0.280, sd: 0.045 }
+  obp:            { mean: 0.380, sd: 0.055 }
+  slg:            { mean: 0.430, sd: 0.090 }
+  ops:            { mean: 0.810, sd: 0.130 }
+  iso:            { mean: 0.150, sd: 0.070 }
+  babip:          { mean: 0.320, sd: 0.045 }
+  woba:           { mean: 0.370, sd: 0.045 }
+  k_pct:          { mean: 0.20,  sd: 0.07 }   # lower is better -> inverted grade
+  bb_pct:         { mean: 0.09,  sd: 0.04 }
+  max_ev:         { mean: 98.0,  sd: 6.0 }    # mph
+  hard_hit_pct:   { mean: 0.32,  sd: 0.12 }
+  whiff_pct:      { mean: 0.24,  sd: 0.08 }   # lower is better -> inverted grade
+  chase_pct:      { mean: 0.28,  sd: 0.08 }   # lower is better -> inverted grade
+  zone_whiff_pct: { mean: 0.15,  sd: 0.07 }   # lower is better -> inverted grade
+
+  # league-context constants for wRC+ (generic linear-weights based, Tango-style
+  # coefficients applied to a D1-approximate run environment — update lg_r_pa and
+  # lg_woba from actual league totals when available for a more precise number)
+  lg_woba: 0.350
+  woba_scale: 1.15
+  lg_r_pa: 0.115
+
+  # generic FanGraphs/Tango-style linear weights, applied as a D1 approximation
+  linear_weights:
+    bb: 0.69
+    hbp: 0.72
+    b1: 0.89
+    b2: 1.27
+    b3: 1.62
+    hr: 2.10
+
+  hard_hit_threshold_mph: 95.0
+
+pitching:
+  velo_fb:        { mean: 90.5, sd: 3.2 }
+  spin_rate_fb:   { mean: 2200, sd: 220 }
+  zone_pct:       { mean: 0.52, sd: 0.06 }
+  edge_pct:       { mean: 0.18, sd: 0.05 }
+  whiff_pct:      { mean: 0.24, sd: 0.08 }
+  chase_pct:      { mean: 0.28, sd: 0.08 }
+  k_pct:          { mean: 0.22, sd: 0.06 }
+  bb_pct:         { mean: 0.09, sd: 0.035 }
+  k_bb_ratio:     { mean: 2.4,  sd: 1.1 }
+
+# Strike zone bounds in feet (catcher's-eye view), used to compute Zone%/Edge%/Chase%
+# from TrackMan PlateLocSide/PlateLocHeight. "Edge" is a shadow-zone band straddling
+# the boundary — pitches here are the classic "borderline/edge" pitches scouts track.
+strike_zone:
+  side_min: -0.83
+  side_max: 0.83
+  height_min: 1.5
+  height_max: 3.5
+  edge_band: 0.25   # feet of buffer on each side of the zone boundary counted as "edge"
+
+# minimum sample sizes below which a stat is flagged as small-sample / low confidence
+# rather than reported at face value
+min_sample:
+  pa_for_rate_stats: 40
+  batted_balls_for_ev: 15
+  pitches_for_pitch_metrics: 30
